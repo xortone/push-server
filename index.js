@@ -68,11 +68,13 @@ app.post('/webhook', (req, res) => {
   const eventData = req.body;
 
   // ساخت پیام نوتیفیکیشن شامل شماره سفارش، نام مشتری و مبلغ کل سفارش
-  const notificationPayload = {
-    title: 'سفارش جدید',
-    body: `سفارش شماره ${eventData.order_id} توسط ${eventData.customer_name} ثبت شد. مبلغ کل: ${eventData.total_price} تومان.`,
-    data: eventData,
-  };
+const notificationPayload = {
+  title: 'سفارش جدید',
+  body: `سفارش شماره ${eventData.order_id} توسط ${eventData.customer_name} ثبت شد. مبلغ کل: ${eventData.total_price} تومان.`,
+  url: `https://ifixcompany.com/ifixmanager/${eventData.order_id}`,
+  data: eventData,
+};
+
 
   subscriptions.forEach((sub) => {
     webpush.sendNotification(sub, JSON.stringify(notificationPayload)).catch((err) => {
