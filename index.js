@@ -2,50 +2,83 @@ import express from 'express';
 import webpush from 'web-push';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-import 'dotenv/config'; // برای خواندن از .env
+import 'dotenv/config';
 
 const app = express();
-const port = process.env.PORT || 3000;  // پورت به طور خودکار در محیط‌های cloud تنظیم می‌شود
+const port = process.env.PORT || 3000;
 
-// اضافه کردن CORS برای اجازه به دامنه خاص (ifixcompany.com)
+// تنظیمات CORS فقط برای دامنه مشخص
 const corsOptions = {
-  origin: 'https://ifixcompany.com',  // اینجا URL وبسایت خودت رو بزار
+  origin: 'https://ifixcompany.com', // دامنه سایت خودت رو اینجا وارد کن
   methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type']
+  allowedHeaders: ['Content-Type'],
 };
+app.use(cors(corsOptions));
 
-app.use(cors(corsOptions));  // اینجا CORS با تنظیمات جدید استفاده شده
-app.use(bodyParser.json());  // برای پردازش درخواست‌های JSON
+app.use(bodyParser.json());
 
-// استفاده از کلیدها از .env
+// کلیدهای VAPID از متغیرهای محیطی
 const publicVapidKey = process.env.VAPID_PUBLIC_KEY;
 const privateVapidKey = process.env.VAPID_PRIVATE_KEY;
 
 webpush.setVapidDetails(
-  'mailto:example@example.com',  // ایمیل خود را اینجا وارد کن
+  'mailto:your-email@example.com', // ایمیل خودت رو اینجا بزن
   publicVapidKey,
   privateVapidKey
 );
 
-let subscriptions = [];  // آرایه‌ای برای ذخیره مشترکین
+let subscriptions = []; // آرایه مشترکین پوش
 
-// ثبت مشترکین
+// ثبت اشتراک‌ها
 app.post('/subscribe', (req, res) => {
-  const subscription = req.body;  // دریافت اطلاعات اشتراک
-  subscriptions.push(subscription);  // اضافه کردن به لیست مشترکین
-  res.status(201).json({});  // پاسخ موفق
-});
-
-// ارسال نوتیفیکیشن
-app.post('/send', async (req, res) => {
-  const payload = JSON.stringify(req.body);  // محتوای نوتیفیکیشن
-  const results = await Promise.allSettled(
-    subscriptions.map(sub => webpush.sendNotification(sub, payload))  // ارسال نوتیفیکیشن به تمام مشترکین
+  const subscription = req.body;
+  const exists = subscriptions.find(
+    (sub) => JSON.stringify(sub) === JSON.stringify(subscription)
   );
-  res.json({ message: 'Push notifications processed.', results });  // پاسخ به کلاینت
+  if (!exists) {
+    subscriptions.push(subscription);
+  }
+  res.status(201).json({});
 });
 
-// شروع به کار سرور
+// ارسال نوتیفیکیشن به همه مشترکین
+app.post('/send', async (req, res) => {
+  const payload = JSON.stringify(req.body);
+  try {
+    const results = await Promise.allSettled(
+      subscriptions.map((sub) => webpush.sendNotification(sub, payload))
+    );
+
+    // حذف مشترکینی که ارسال بهشون موفق نبوده
+    subscriptions = subscriptions.filter((_, i) => results[i].status === 'fulfilled');
+
+    res.json({ message: 'Push notifications sent.', results });
+  } catch (error) {
+    console.error('Error sending notifications:', error);
+    res.status(500).json({ error: 'Error sending notifications' });
+  }
+});
+
+// مسیر وب‌هوک برای دریافت سفارشات از وردپرس
+app.post('/webhook', (req, res) => {
+  const eventData = req.body;
+
+  // ساخت پیام نوتیفیکیشن شامل شماره سفارش، نام مشتری و مبلغ کل سفارش
+  const notificationPayload = {
+    title: 'سفارش جدید',
+    body: `سفارش شماره ${eventData.order_id} توسط ${eventData.customer_name} ثبت شد. مبلغ کل: ${eventData.total_price} تومان.`,
+    data: eventData,
+  };
+
+  subscriptions.forEach((sub) => {
+    webpush.sendNotification(sub, JSON.stringify(notificationPayload)).catch((err) => {
+      console.error('Failed to send notification to a subscriber:', err);
+    });
+  });
+
+  res.status(200).json({ received: true });
+});
+
 app.listen(port, () => {
   console.log(`✅ Server is running on port ${port}`);
 });
