@@ -14,7 +14,6 @@ const corsOptions = {
   allowedHeaders: ['Content-Type'],
 };
 app.use(cors(corsOptions));
-
 app.use(bodyParser.json());
 
 // کلیدهای VAPID از متغیرهای محیطی
@@ -28,6 +27,11 @@ webpush.setVapidDetails(
 );
 
 let subscriptions = []; // آرایه مشترکین پوش
+
+// ⬇️ route مخصوص کرون‌جاب برای بیدار نگه داشتن سرور
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
 
 // ثبت اشتراک‌ها
 app.post('/subscribe', (req, res) => {
