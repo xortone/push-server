@@ -2,12 +2,19 @@ import express from 'express';
 import webpush from 'web-push';
 import cors from 'cors';
 import bodyParser from 'body-parser';
-import 'dotenv/config'; // اضافه شد برای خواندن .env
+import 'dotenv/config'; // برای خواندن از .env
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+// اضافه کردن CORS برای اجازه به دامنه خاص (ifixcompany.com)
+const corsOptions = {
+  origin: 'https://ifixcompany.com',  // اینجا URL وبسایت خودت رو بزار
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type']
+};
+
+app.use(cors(corsOptions));  // اینجا CORS با تنظیمات جدید استفاده شده
 app.use(bodyParser.json());
 
 // استفاده از کلیدها از .env
